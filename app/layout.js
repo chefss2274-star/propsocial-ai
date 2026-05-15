@@ -11,7 +11,10 @@ const inter = Inter({
 export const metadata = {
   title: 'PropSocial AI — Social copy for real estate agents',
   description:
-    'Turn one property video or listing into 3 scroll-stopping social posts: Professional, High-Energy, and Local-Community.',
+    'Turn one property video or listing into 3 scroll-stopping social posts: Professional, High-Energy, and Local-Community.'
+};
+
+export const viewport = {
   themeColor: '#020617'
 };
 
