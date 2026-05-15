@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { X, Check, Loader2, Sparkles, Crown, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Check, Loader2, Sparkles, Crown, Zap, AlertCircle } from 'lucide-react';
 import { usePricing } from '../context/PricingContext';
 
 const STARTER_FEATURES = [
@@ -29,6 +29,7 @@ export default function PricingModal() {
     checkoutLoading,
     setCheckoutLoading
   } = usePricing();
+  const [checkoutError, setCheckoutError] = useState(null);
 
   // Esc-to-close + body scroll lock while modal is open.
   useEffect(() => {
@@ -53,6 +54,19 @@ export default function PricingModal() {
         ? process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID
         : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
 
+    setCheckoutError(null);
+
+    // Catch the most common deploy-time mistake before the network round-trip:
+    // NEXT_PUBLIC_ env vars get baked into the client bundle at build time, so
+    // if the price IDs were added to Vercel AFTER the last deploy they'll be
+    // undefined here even though they're "set" in the dashboard.
+    if (!priceId) {
+      setCheckoutError(
+        `NEXT_PUBLIC_STRIPE_${tier.toUpperCase()}_PRICE_ID is not in the client bundle. If you just added it in Vercel, trigger a new deployment so the build picks it up.`
+      );
+      return;
+    }
+
     setCheckoutLoading(tier);
     try {
       const res = await fetch('/api/stripe/checkout', {
@@ -60,14 +74,22 @@ export default function PricingModal() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier, priceId })
       });
-      const data = await res.json();
-      if (data?.url) {
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.message || data?.error || `Checkout API returned ${res.status}`);
+      }
+
+      // Only redirect to absolute URLs (real Stripe) or our own /checkout/mock
+      // stub path. Anything else is a bug — fail loudly instead of 404'ing.
+      if (typeof data?.url === 'string' && /^(https?:\/\/|\/checkout\/mock)/.test(data.url)) {
         window.location.href = data.url;
         return;
       }
-      console.warn('Checkout response missing url', data);
+      throw new Error('Checkout server did not return a valid URL.');
     } catch (err) {
-      console.error('Checkout request failed', err);
+      console.error('[checkout] request failed', err);
+      setCheckoutError(err?.message ?? 'Checkout request failed.');
     } finally {
       setCheckoutLoading(null);
     }
@@ -155,6 +177,25 @@ export default function PricingModal() {
             onSelect={() => handleCheckout('pro')}
           />
         </div>
+
+        {checkoutError && (
+          <div
+            role="alert"
+            className="mx-6 mb-4 flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 sm:mx-8"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
+            <div className="flex-1">
+              <p className="font-medium text-rose-100">Checkout couldn&apos;t start</p>
+              <p className="mt-0.5 text-xs text-rose-200/80">{checkoutError}</p>
+            </div>
+            <button
+              onClick={() => setCheckoutError(null)}
+              className="text-xs text-rose-300 hover:text-rose-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         <div className="relative flex flex-col items-center justify-between gap-3 border-t border-slate-800 bg-slate-950/40 px-6 py-5 sm:flex-row sm:px-8">
           <p className="text-[11px] text-slate-500">
