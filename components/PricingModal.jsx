@@ -49,30 +49,18 @@ export default function PricingModal() {
   if (!showPricingModal) return null;
 
   const handleCheckout = async (tier) => {
-    const priceId =
-      tier === 'starter'
-        ? process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID
-        : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
-
     setCheckoutError(null);
-
-    // Catch the most common deploy-time mistake before the network round-trip:
-    // NEXT_PUBLIC_ env vars get baked into the client bundle at build time, so
-    // if the price IDs were added to Vercel AFTER the last deploy they'll be
-    // undefined here even though they're "set" in the dashboard.
-    if (!priceId) {
-      setCheckoutError(
-        `NEXT_PUBLIC_STRIPE_${tier.toUpperCase()}_PRICE_ID is not in the client bundle. If you just added it in Vercel, trigger a new deployment so the build picks it up.`
-      );
-      return;
-    }
-
     setCheckoutLoading(tier);
+
+    // Price ID validation and Stripe credential validation both live on the
+    // server now (see /api/stripe/checkout). The client just sends the tier
+    // and trusts the API to either return a redirect URL or a descriptive
+    // error message.
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier, priceId })
+        body: JSON.stringify({ tier })
       });
       const data = await res.json().catch(() => ({}));
 

@@ -19,17 +19,26 @@ export async function POST(request) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const { tier, priceId } = body ?? {};
+  const { tier } = body ?? {};
 
   if (tier !== 'starter' && tier !== 'pro') {
     return NextResponse.json({ error: 'invalid_tier' }, { status: 400 });
   }
 
+  // Server-side resolution of the price ID. NEXT_PUBLIC_ env vars are readable
+  // from the server too, so this works without exposing anything new — and
+  // the API becomes the single source of truth for both the price lookup and
+  // the secret key check.
+  const priceId =
+    tier === 'starter'
+      ? process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID
+      : process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID;
+
   if (!priceId || typeof priceId !== 'string' || !priceId.startsWith('price_')) {
     return NextResponse.json(
       {
         error: 'missing_price_id',
-        message: `NEXT_PUBLIC_STRIPE_${tier.toUpperCase()}_PRICE_ID is not set or has an unexpected format. Stripe price IDs start with "price_". After updating env vars in Vercel, redeploy so the frontend bundle picks up the new value.`
+        message: `NEXT_PUBLIC_STRIPE_${tier.toUpperCase()}_PRICE_ID is not set on the server, or doesn't look like a Stripe price ID ("price_..."). Add it in Vercel → Project → Settings → Environment Variables, then redeploy.`
       },
       { status: 400 }
     );
