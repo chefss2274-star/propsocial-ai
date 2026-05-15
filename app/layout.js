@@ -1,5 +1,6 @@
 import './globals.css';
 import { Inter } from 'next/font/google';
+import { PricingProvider } from '../context/PricingContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -18,7 +19,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`dark ${inter.variable}`}>
       <body className="font-sans antialiased bg-slate-950 text-slate-100">
-        {children}
+        <PricingProvider>{children}</PricingProvider>
       </body>
     </html>
   );

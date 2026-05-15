@@ -7,6 +7,8 @@ import InputTabs from '../components/InputTabs';
 import OptionsPanel from '../components/OptionsPanel';
 import GenerateButton from '../components/GenerateButton';
 import ResultsGrid from '../components/ResultsGrid';
+import PricingModal from '../components/PricingModal';
+import { usePricing } from '../context/PricingContext';
 
 export default function HomePage() {
   const [textInput, setTextInput] = useState('');
@@ -15,8 +17,17 @@ export default function HomePage() {
   const [tone, setTone] = useState('Balanced');
   const [streaming, setStreaming] = useState(false);
   const [hasResults, setHasResults] = useState(false);
+  const { isSubscribed, setShowPricingModal } = usePricing();
 
   const handleGenerate = () => {
+    // Paywall gate: unauthenticated / unsubscribed users see the pricing modal
+    // instead of triggering a generation. Once they pick a plan (or use the
+    // Demo Mode bypass), `isSubscribed` flips to true and this passes through.
+    if (!isSubscribed) {
+      setShowPricingModal(true);
+      return;
+    }
+
     setStreaming(true);
     setHasResults(false);
     // Simulated streaming delay so the loading state is visible before the
@@ -86,6 +97,8 @@ export default function HomePage() {
           </div>
         </main>
       </div>
+
+      <PricingModal />
     </div>
   );
 }
