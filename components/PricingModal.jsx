@@ -55,7 +55,7 @@ export default function PricingModal() {
 
     setCheckoutLoading(tier);
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier, priceId })
