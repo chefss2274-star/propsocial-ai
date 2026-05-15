@@ -1,25 +1,30 @@
 'use client';
 
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useMemo } from 'react';
 
 const PricingContext = createContext(null);
 
 export function PricingProvider({ children }) {
   const [showPricingModal, setShowPricingModal] = useState(false);
-  // Replace `isSubscribed` with a real auth/subscription check (NextAuth session,
-  // Stripe customer lookup, etc.) once auth is wired up. Defaulting to false so
-  // every Generate click triggers the paywall during local development.
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  // Tier model: null = unauthenticated/unsubscribed, otherwise 'starter' | 'pro'.
+  // In production, hydrate this from your auth session / Stripe customer lookup
+  // (e.g. inside a server component or via SWR against /api/me).
+  const [tier, setTier] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(null); // 'starter' | 'pro' | null
 
-  const value = {
-    showPricingModal,
-    setShowPricingModal,
-    isSubscribed,
-    setIsSubscribed,
-    checkoutLoading,
-    setCheckoutLoading
-  };
+  const value = useMemo(
+    () => ({
+      showPricingModal,
+      setShowPricingModal,
+      tier,
+      setTier,
+      isSubscribed: tier !== null,
+      isPro: tier === 'pro',
+      checkoutLoading,
+      setCheckoutLoading
+    }),
+    [showPricingModal, tier, checkoutLoading]
+  );
 
   return <PricingContext.Provider value={value}>{children}</PricingContext.Provider>;
 }

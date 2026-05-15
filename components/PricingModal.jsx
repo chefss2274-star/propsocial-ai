@@ -25,7 +25,7 @@ export default function PricingModal() {
   const {
     showPricingModal,
     setShowPricingModal,
-    setIsSubscribed,
+    setTier,
     checkoutLoading,
     setCheckoutLoading
   } = usePricing();
@@ -73,8 +73,8 @@ export default function PricingModal() {
     }
   };
 
-  const handleDemoBypass = () => {
-    setIsSubscribed(true);
+  const handleDemoBypass = (asTier) => {
+    setTier(asTier);
     setShowPricingModal(false);
   };
 
@@ -161,13 +161,25 @@ export default function PricingModal() {
             Secure checkout powered by Stripe · SSL encrypted · we never store
             card details.
           </p>
-          <button
-            onClick={handleDemoBypass}
-            disabled={!!checkoutLoading}
-            className="text-xs font-medium text-slate-400 underline-offset-4 transition hover:text-slate-200 hover:underline disabled:opacity-40"
-          >
-            Continue in Demo Mode →
-          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-wider text-slate-600">
+              Dev bypass
+            </span>
+            <button
+              onClick={() => handleDemoBypass('starter')}
+              disabled={!!checkoutLoading}
+              className="rounded-md border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:border-slate-600 hover:text-slate-100 disabled:opacity-40"
+            >
+              Demo as Starter
+            </button>
+            <button
+              onClick={() => handleDemoBypass('pro')}
+              disabled={!!checkoutLoading}
+              className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-40"
+            >
+              Demo as Pro
+            </button>
+          </div>
         </div>
       </div>
     </div>

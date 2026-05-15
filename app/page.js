@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import Header from '../components/Header';
 import Sidebar from '../components/Sidebar';
 import InputTabs from '../components/InputTabs';
@@ -9,6 +10,7 @@ import GenerateButton from '../components/GenerateButton';
 import ResultsGrid from '../components/ResultsGrid';
 import PricingModal from '../components/PricingModal';
 import { usePricing } from '../context/PricingContext';
+import { buildVariations } from '../lib/mockData';
 
 export default function HomePage() {
   const [textInput, setTextInput] = useState('');
@@ -17,25 +19,55 @@ export default function HomePage() {
   const [tone, setTone] = useState('Balanced');
   const [streaming, setStreaming] = useState(false);
   const [hasResults, setHasResults] = useState(false);
-  const { isSubscribed, setShowPricingModal } = usePricing();
+  const [variations, setVariations] = useState(null);
+  const [error, setError] = useState(null);
+  const { isSubscribed, tier, setShowPricingModal } = usePricing();
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     // Paywall gate: unauthenticated / unsubscribed users see the pricing modal
-    // instead of triggering a generation. Once they pick a plan (or use the
+    // instead of triggering a generation. Once they pick a plan (or use a
     // Demo Mode bypass), `isSubscribed` flips to true and this passes through.
     if (!isSubscribed) {
       setShowPricingModal(true);
       return;
     }
 
+    if (!textInput || textInput.trim().length < 5) {
+      setError('Add property details or paste a listing link before generating.');
+      return;
+    }
+
+    setError(null);
     setStreaming(true);
     setHasResults(false);
-    // Simulated streaming delay so the loading state is visible before the
-    // mock variations populate. Replace with a real fetch() to your API route.
-    setTimeout(() => {
-      setStreaming(false);
+    setVariations(null);
+
+    try {
+      const res = await fetch('/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyNotes: textInput,
+          propertyType,
+          city,
+          tone,
+          tier
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || data?.hint || data?.error || 'Generation failed.');
+      }
+
+      setVariations(buildVariations(data.variations));
       setHasResults(true);
-    }, 1800);
+    } catch (err) {
+      console.error('Generate request failed', err);
+      setError(err?.message ?? 'Something went wrong. Please try again.');
+    } finally {
+      setStreaming(false);
+    }
   };
 
   return (
@@ -58,7 +90,11 @@ export default function HomePage() {
           <div className="mb-8">
             <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-300">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-              New — Multi-platform variant generation
+              {tier === 'pro'
+                ? 'Pro tier · Luxury tone protocol active'
+                : tier === 'starter'
+                  ? 'Starter tier · Core variations active'
+                  : 'New — Multi-platform variant generation'}
             </span>
             <h1 className="mt-4 text-2xl font-bold tracking-tight text-slate-100 sm:text-3xl">
               Turn one listing into{' '}
@@ -90,10 +126,33 @@ export default function HomePage() {
               </p>
               <GenerateButton onClick={handleGenerate} loading={streaming} />
             </div>
+
+            {error && (
+              <div
+                role="alert"
+                className="flex items-start gap-3 rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-300" />
+                <div className="flex-1">
+                  <p className="font-medium text-rose-100">Generation failed</p>
+                  <p className="mt-0.5 text-xs text-rose-200/80">{error}</p>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-xs text-rose-300 hover:text-rose-100"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-10">
-            <ResultsGrid streaming={streaming} hasResults={hasResults} />
+            <ResultsGrid
+              variations={variations}
+              streaming={streaming}
+              hasResults={hasResults}
+            />
           </div>
         </main>
       </div>

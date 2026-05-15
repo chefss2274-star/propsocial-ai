@@ -2,10 +2,18 @@
 
 import { Download } from 'lucide-react';
 import ResultCard from './ResultCard';
-import { mockVariations } from '../lib/mockData';
+import { VARIATION_TEMPLATES, buildVariations, MOCK_CONTENT } from '../lib/mockData';
 
-export default function ResultsGrid({ streaming, hasResults }) {
+export default function ResultsGrid({ variations, streaming, hasResults }) {
   if (!streaming && !hasResults) return null;
+
+  // During streaming we render skeleton placeholders, so the displayed text
+  // doesn't matter — but each card still needs its presentation metadata.
+  const display = variations ?? buildVariations(streaming ? {} : MOCK_CONTENT);
+  // Guarantee three cards in the canonical order even if the API omits a key.
+  const ordered = VARIATION_TEMPLATES.map(
+    (tpl) => display.find((v) => v.id === tpl.id) ?? { ...tpl, content: '' }
+  );
 
   return (
     <section>
@@ -24,7 +32,7 @@ export default function ResultsGrid({ streaming, hasResults }) {
         )}
       </div>
       <div className="grid gap-4 lg:grid-cols-3">
-        {mockVariations.map((v, i) => (
+        {ordered.map((v, i) => (
           <ResultCard key={v.id} variation={v} streaming={streaming} delay={i * 200} />
         ))}
       </div>
