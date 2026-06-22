@@ -107,8 +107,9 @@ export async function POST(request) {
         metadata: { tier, user_id: user.id }
       },
 
-      // Skips card collection during the trial when Stripe allows it.
-      payment_method_collection: 'if_required',
+      // Always collect a card up-front so the trial converts to a real
+      // charge automatically on day 8 unless the user cancels first.
+      payment_method_collection: 'always',
 
       allow_promotion_codes: true,
       success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
