@@ -25,7 +25,9 @@ export default function PricingModal() {
   const {
     showPricingModal,
     setShowPricingModal,
-    setTier,
+    isAuthenticated,
+    isDev,
+    setDevTier,
     checkoutLoading,
     setCheckoutLoading
   } = usePricing();
@@ -50,6 +52,14 @@ export default function PricingModal() {
 
   const handleCheckout = async (tier) => {
     setCheckoutError(null);
+
+    // Stripe Checkout requires a signed-in user so the webhook can map the
+    // resulting subscription back to a Supabase user_id via client_reference_id.
+    if (!isAuthenticated) {
+      window.location.href = `/signin?next=${encodeURIComponent('/?pricing=' + tier)}`;
+      return;
+    }
+
     setCheckoutLoading(tier);
 
     // Price ID validation and Stripe credential validation both live on the
@@ -84,7 +94,8 @@ export default function PricingModal() {
   };
 
   const handleDemoBypass = (asTier) => {
-    setTier(asTier);
+    // Dev-only — the bypass buttons render gated behind `isDev`.
+    setDevTier(asTier);
     setShowPricingModal(false);
   };
 
@@ -190,25 +201,27 @@ export default function PricingModal() {
             Secure checkout powered by Stripe · SSL encrypted · we never store
             card details.
           </p>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-wider text-slate-600">
-              Dev bypass
-            </span>
-            <button
-              onClick={() => handleDemoBypass('starter')}
-              disabled={!!checkoutLoading}
-              className="rounded-md border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:border-slate-600 hover:text-slate-100 disabled:opacity-40"
-            >
-              Demo as Starter
-            </button>
-            <button
-              onClick={() => handleDemoBypass('pro')}
-              disabled={!!checkoutLoading}
-              className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-40"
-            >
-              Demo as Pro
-            </button>
-          </div>
+          {isDev && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-slate-600">
+                Dev bypass
+              </span>
+              <button
+                onClick={() => handleDemoBypass('starter')}
+                disabled={!!checkoutLoading}
+                className="rounded-md border border-slate-700 px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:border-slate-600 hover:text-slate-100 disabled:opacity-40"
+              >
+                Demo as Starter
+              </button>
+              <button
+                onClick={() => handleDemoBypass('pro')}
+                disabled={!!checkoutLoading}
+                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-40"
+              >
+                Demo as Pro
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

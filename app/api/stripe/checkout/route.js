@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { getServerUser } from '../../../../lib/auth';
+import { getServerSupabase } from '../../../../lib/supabase/server';
 
 // Initialize once per Lambda cold start. When STRIPE_SECRET_KEY is missing
 // in *development* we fall back to a stub URL so local UI flows still work;
@@ -23,6 +25,14 @@ export async function POST(request) {
 
   if (tier !== 'starter' && tier !== 'pro') {
     return NextResponse.json({ error: 'invalid_tier' }, { status: 400 });
+  }
+
+  const user = await getServerUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: 'unauthenticated', message: 'Sign in before starting checkout.' },
+      { status: 401 }
+    );
   }
 
   // Server-side resolution of the price ID. NEXT_PUBLIC_ env vars are readable
@@ -68,16 +78,33 @@ export async function POST(request) {
     process.env.NEXT_PUBLIC_APP_URL ||
     'http://localhost:3000';
 
+  // Reuse an existing Stripe customer if we've created one for this user
+  // before — avoids duplicate customer records on re-subscription.
+  const supabase = getServerSupabase();
+  const { data: existingSub } = await supabase
+    .from('subscriptions')
+    .select('stripe_customer_id')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
 
+      // Bind this checkout to the authenticated Supabase user. The webhook
+      // reads `client_reference_id` to know which user the resulting
+      // subscription belongs to.
+      client_reference_id: user.id,
+      ...(existingSub?.stripe_customer_id
+        ? { customer: existingSub.stripe_customer_id }
+        : { customer_email: user.email }),
+
       // 7-day free trial enforced server-side so the hosted Checkout page
       // matches the "7-day free trial" promise on the pricing modal cards.
       subscription_data: {
         trial_period_days: 7,
-        metadata: { tier }
+        metadata: { tier, user_id: user.id }
       },
 
       // Skips card collection during the trial when Stripe allows it.
@@ -86,7 +113,7 @@ export async function POST(request) {
       allow_promotion_codes: true,
       success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/canceled`,
-      metadata: { tier }
+      metadata: { tier, user_id: user.id }
     });
 
     if (!session?.url) {

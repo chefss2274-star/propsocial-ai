@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { getServerUser, getServerSubscription, activeTier } from '../../../lib/auth';
+
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = 1500;
@@ -80,7 +83,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
 
-  const { propertyNotes, propertyType, city, tone, tier } = body ?? {};
+  const { propertyNotes, propertyType, city, tone, tier: clientTier } = body ?? {};
 
   if (
     typeof propertyNotes !== 'string' ||
@@ -95,6 +98,33 @@ export async function POST(request) {
     );
   }
 
+  // Session + tier enforcement. In production the tier is read from the DB
+  // — never trusted from the client. In dev, we accept a `tier` from the
+  // request body so the demo bypass buttons still work without Supabase set up.
+  let resolvedTier;
+  const user = await getServerUser();
+
+  if (user) {
+    const subscription = await getServerSubscription(user.id);
+    resolvedTier = activeTier(subscription);
+    if (!resolvedTier) {
+      return NextResponse.json(
+        {
+          error: 'no_active_subscription',
+          message: 'Your subscription is not active. Choose a plan to continue.'
+        },
+        { status: 403 }
+      );
+    }
+  } else if (!IS_PROD && (clientTier === 'starter' || clientTier === 'pro')) {
+    resolvedTier = clientTier;
+  } else {
+    return NextResponse.json(
+      { error: 'unauthenticated', message: 'Sign in to generate posts.' },
+      { status: 401 }
+    );
+  }
+
   // Local dev fallback so the UI flow still works without an API key set.
   if (!anthropic) {
     return NextResponse.json({
@@ -104,7 +134,7 @@ export async function POST(request) {
     });
   }
 
-  const isPro = tier === 'pro';
+  const isPro = resolvedTier === 'pro';
   // Two system blocks so the base prompt can be cached independently of the
   // optional Pro suffix — keeps cache hits warm across Starter + Pro traffic
   // once the prompt grows past the cache-eligibility threshold.
